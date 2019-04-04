@@ -2,11 +2,13 @@ package rest
 
 import (
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"net/http"
 	url "net/url"
+
 	//clientrest "github.com/cosmos/cosmos-sdk/client/rest"
+	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
+
 	//sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 	//"github.com/cosmos/sdk-application-tutorial/x/nameservice"
@@ -40,6 +42,7 @@ func RegisterRoutes(cliCtx context.CLIContext, r *mux.Router, cdc *codec.Codec) 
 	r.HandleFunc(fmt.Sprintf("/balance/{%s}", ownerAddress), queryBalanceHandler(cdc, cliCtx)).Methods("GET")
 	r.HandleFunc(fmt.Sprint("/proof"), queryProofHandler(cdc, cliCtx)).Methods("GET")
 	r.HandleFunc(fmt.Sprint("/health"), healthHandler(cdc, cliCtx)).Methods("GET")
+	r.HandleFunc(fmt.Sprint("/spend"), postSpendHandler(cdc, cliCtx)).Methods("POST")
 }
 
 func healthHandler(cdc *codec.Codec, cliCtx context.CLIContext) http.HandlerFunc {
@@ -195,6 +198,58 @@ func postDepositHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFu
 		fmt.Println("3")
 		fmt.Println("res")
 		rest.PostProcessResponse(w, cdc, res.TxHash, ctx.Indent)
+		return
+	}
+}
+
+type PostSpendReq struct {
+	Transaction plasma.Transaction `json:"transaction"` // Transaction to spend
+	Sync        bool               `json:"sync"`        // Wait for transaction commitment synchronously
+}
+
+func postSpendHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req PostSpendReq
+
+		if !rest.ReadRESTReq(w, r, cdc, &req) {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to parse request")
+			return
+		}
+
+		fmt.Println("tx to spend: ", req.Transaction)
+		fmt.Println("sync: ", req.Sync)
+
+		// create SpendMsg and txBytes
+		msg := msgs.SpendMsg{
+			Transaction: req.Transaction,
+		}
+		if err := msg.ValidateBasic(); err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, "Invalid `SpendMsg`: "+err.Error())
+			return
+		}
+
+		txBytes, err := rlp.EncodeToBytes(&msg)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to encode `SpendMsg`: "+err.Error())
+			return
+		}
+
+		// broadcast to the node
+		if req.Sync {
+			res, err := ctx.BroadcastTxAndAwaitCommit(txBytes)
+			if err != nil {
+				rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to broadcast `SpendMsg` synchronously: "+err.Error())
+				return
+			}
+			fmt.Printf("Spend tx is committed synchronously at block %d. Hash 0x%x\n", res.Height, res.TxHash)
+		} else {
+			res, err := ctx.BroadcastTxAsync(txBytes)
+			if err != nil {
+				rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to broadcast `SpendMsg` asynchronously: "+err.Error())
+				return
+			}
+			fmt.Printf("Spend tx is committed asynchronously at block %d. Hash 0x%x\n", res.Height, res.TxHash)
+		}
 		return
 	}
 }
