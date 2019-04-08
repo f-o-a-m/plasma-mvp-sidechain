@@ -9,7 +9,7 @@ import (
 type Input struct {
 	Position          `json:"position"`
 	Signature         [65]byte   `json:"signature"`
-	ConfirmSignatures [][65]byte `json:"confimSignature"`
+	ConfirmSignatures [][65]byte `json:"confirmSignatures"`
 }
 
 func NewInput(position Position, sig [65]byte, confirmSigs [][65]byte) Input {
