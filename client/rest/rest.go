@@ -202,26 +202,20 @@ func postDepositHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFu
 	}
 }
 
-type PostSpendReq struct {
-	Transaction plasma.Transaction `json:"transaction"` // Transaction to spend
-	Sync        bool               `json:"sync"`        // Wait for transaction commitment synchronously
-}
-
 func postSpendHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req PostSpendReq
+		var req plasma.Transaction
 
 		if !rest.ReadRESTReq(w, r, cdc, &req) {
 			rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to parse request")
 			return
 		}
 
-		fmt.Println("tx to spend: ", req.Transaction)
-		fmt.Println("sync: ", req.Sync)
+		fmt.Println("tx to spend: ", req)
 
 		// create SpendMsg and txBytes
 		msg := msgs.SpendMsg{
-			Transaction: req.Transaction,
+			Transaction: req,
 		}
 		if err := msg.ValidateBasic(); err != nil {
 			rest.WriteErrorResponse(w, http.StatusBadRequest, "Invalid `SpendMsg`: "+err.Error())
@@ -235,21 +229,12 @@ func postSpendHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc
 		}
 
 		// broadcast to the node
-		if req.Sync {
-			res, err := ctx.BroadcastTxAndAwaitCommit(txBytes)
-			if err != nil {
-				rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to broadcast `SpendMsg` synchronously: "+err.Error())
-				return
-			}
-			fmt.Printf("Spend tx is committed synchronously at block %d. Hash 0x%x\n", res.Height, res.TxHash)
-		} else {
-			res, err := ctx.BroadcastTxAsync(txBytes)
-			if err != nil {
-				rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to broadcast `SpendMsg` asynchronously: "+err.Error())
-				return
-			}
-			fmt.Printf("Spend tx is committed asynchronously at block %d. Hash 0x%x\n", res.Height, res.TxHash)
+		res, err := ctx.BroadcastTxAndAwaitCommit(txBytes)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to broadcast `SpendMsg` "+err.Error())
+			return
 		}
+		rest.PostProcessResponse(w, cdc, res.TxHash, ctx.Indent)
 		return
 	}
 }
