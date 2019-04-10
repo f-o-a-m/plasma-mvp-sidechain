@@ -41,6 +41,7 @@ func RegisterRoutes(cliCtx context.CLIContext, r *mux.Router, cdc *codec.Codec) 
 	// r.HandleFunc(fmt.Sprintf("/%s/names", storeName), setNameHandler(cdc, cliCtx)).Methods("PUT")
 	r.HandleFunc(fmt.Sprint("/deposit/include"), postDepositHandler(cdc, cliCtx)).Methods("POST")
 	r.HandleFunc(fmt.Sprintf("/balance/{%s}", ownerAddress), queryBalanceHandler(cdc, cliCtx)).Methods("GET")
+	r.HandleFunc(fmt.Sprint("/utxo"), queryUTXOHandler(cdc, cliCtx)).Methods("GET")
 	r.HandleFunc(fmt.Sprint("/proof"), queryProofHandler(cdc, cliCtx)).Methods("GET")
 	r.HandleFunc(fmt.Sprint("/health"), healthHandler(cdc, cliCtx)).Methods("GET")
 	r.HandleFunc(fmt.Sprint("/spend"), postSpendHandler(cdc, cliCtx)).Methods("POST")
@@ -97,6 +98,53 @@ func queryProofHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFun
 		proofResp := ProofResp{*tx, proofAuntsHex}
 
 		rest.PostProcessResponse(w, cdc, proofResp, ctx.Indent)
+	}
+
+}
+
+func queryUTXOHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		vals, err := url.ParseQuery(r.URL.RawQuery)
+
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		ownerStr := vals[ownerAddress][0]
+		posStr := vals[position][0]
+
+		owner := ethcmn.HexToAddress(ownerStr)
+		pos, err := plasma.FromPositionString(posStr)
+
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		key := store.GetUTXOStoreKey(owner, pos)
+		res, err := ctx.QuerySubspace(key, "utxo")
+
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		if len(res) != 1 {
+			rest.WriteErrorResponse(w, http.StatusNotFound, "No UTXO found")
+			return
+		}
+
+		utxoBytes := res[0]
+
+		utxo := store.UTXO{}
+		if err := rlp.DecodeBytes(utxoBytes.Value, &utxo); err != nil {
+			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
+		}
+
+		rest.PostProcessResponse(w, cdc, utxo, ctx.Indent)
+
 	}
 
 }
@@ -215,13 +263,7 @@ func postSpendHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc
 
 		fmt.Println("tx to spend: ", req)
 
-		txList := req.ToTxList()
-		fmt.Printf("txList %x \n\n", txList)
-
 		txHash := req.TxHash()
-		fmt.Println("txHash to sign: ", ethcmn.ToHex(txHash))
-		txBytesA, _ := rlp.EncodeToBytes(&txList)
-		fmt.Printf("txBytes rlp: %x", txBytesA)
 
 		pubKey, err := crypto.SigToPub(txHash, req.Input0.Signature[:])
 		if err != nil {

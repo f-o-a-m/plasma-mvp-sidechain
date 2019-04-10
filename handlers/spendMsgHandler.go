@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"github.com/FourthState/plasma-mvp-sidechain/msgs"
 	"github.com/FourthState/plasma-mvp-sidechain/plasma"
 	"github.com/FourthState/plasma-mvp-sidechain/store"
@@ -47,11 +48,13 @@ func NewSpendHandler(utxoStore store.UTXOStore, plasmaStore store.PlasmaStore, n
 		}
 
 		// try to spend the inputs. Abort if the inputs don't exist or have been spent
+		fmt.Println("Spending first output")
 		res := utxoStore.SpendUTXO(ctx, common.BytesToAddress(inputKeys[0][:common.AddressLength]), spendMsg.Input0.Position, spenderKeys)
 		if !res.IsOK() {
 			return res
 		}
 		if spendMsg.HasSecondInput() {
+			fmt.Println("Spending second output")
 			res := utxoStore.SpendUTXO(ctx, common.BytesToAddress(inputKeys[1][:common.AddressLength]), spendMsg.Input1.Position, spenderKeys)
 			if !res.IsOK() {
 				return res
