@@ -18,6 +18,7 @@ import (
 	"github.com/FourthState/plasma-mvp-sidechain/store"
 	ethcmn "github.com/ethereum/go-ethereum/common"
 	hex "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
 	tm "github.com/tendermint/tendermint/rpc/core/types"
@@ -43,6 +44,7 @@ func RegisterRoutes(cliCtx context.CLIContext, r *mux.Router, cdc *codec.Codec) 
 	r.HandleFunc(fmt.Sprint("/proof"), queryProofHandler(cdc, cliCtx)).Methods("GET")
 	r.HandleFunc(fmt.Sprint("/health"), healthHandler(cdc, cliCtx)).Methods("GET")
 	r.HandleFunc(fmt.Sprint("/spend"), postSpendHandler(cdc, cliCtx)).Methods("POST")
+	r.HandleFunc(fmt.Sprint("/tx/hash"), postTxHashHandler(cdc, cliCtx)).Methods("POST")
 }
 
 func healthHandler(cdc *codec.Codec, cliCtx context.CLIContext) http.HandlerFunc {
@@ -213,6 +215,22 @@ func postSpendHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc
 
 		fmt.Println("tx to spend: ", req)
 
+		txList := req.ToTxList()
+		fmt.Printf("txList %x \n\n", txList)
+
+		txHash := req.TxHash()
+		fmt.Println("txHash to sign: ", ethcmn.ToHex(txHash))
+		txBytesA, _ := rlp.EncodeToBytes(&txList)
+		fmt.Printf("txBytes rlp: %x", txBytesA)
+
+		pubKey, err := crypto.SigToPub(txHash, req.Input0.Signature[:])
+		if err != nil {
+			fmt.Println("error to get public key out of signature")
+			return
+		}
+		signAddr := crypto.PubkeyToAddress(*pubKey)
+		fmt.Printf("address from signature: %x \n", signAddr)
+
 		// create SpendMsg and txBytes
 		msg := msgs.SpendMsg{
 			Transaction: req,
@@ -236,5 +254,21 @@ func postSpendHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc
 		}
 		rest.PostProcessResponse(w, cdc, res.TxHash, ctx.Indent)
 		return
+	}
+}
+
+func postTxHashHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req plasma.Transaction
+
+		if !rest.ReadRESTReq(w, r, cdc, &req) {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, "Failed to parse request")
+			return
+		}
+
+		txHash := ethcmn.ToHex(req.TxHash())
+		fmt.Println("txHash (hex): ", txHash)
+
+		rest.PostProcessResponse(w, cdc, txHash, ctx.Indent)
 	}
 }
