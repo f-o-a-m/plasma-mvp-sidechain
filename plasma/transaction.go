@@ -22,7 +22,7 @@ type Transaction struct {
 	Fee     *big.Int `json:"fee"`
 }
 
-type txList struct {
+type TxList struct {
 	BlkNum0           [32]byte
 	TxIndex0          [32]byte
 	OIndex0           [32]byte
@@ -41,13 +41,13 @@ type txList struct {
 }
 
 type rawTx struct {
-	Tx   txList
+	Tx   TxList
 	Sigs [2][65]byte
 }
 
 // EncodeRLP satisfies the rlp interface for Transaction
 func (tx *Transaction) EncodeRLP(w io.Writer) error {
-	t := &rawTx{tx.toTxList(), [2][65]byte{tx.Input0.Signature, tx.Input1.Signature}}
+	t := &rawTx{tx.ToTxList(), [2][65]byte{tx.Input0.Signature, tx.Input1.Signature}}
 
 	return rlp.Encode(w, t)
 }
@@ -110,7 +110,7 @@ func (tx Transaction) TxBytes() []byte {
 
 // TxHash returns the bytes the signatures are signed over
 func (tx Transaction) TxHash() []byte {
-	txList := tx.toTxList()
+	txList := tx.ToTxList()
 	bytes, _ := rlp.EncodeToBytes(&txList)
 	return crypto.Keccak256(bytes)
 }
@@ -156,11 +156,11 @@ func (tx Transaction) String() string {
 
 /* Helpers */
 
-func (tx Transaction) toTxList() txList {
+func (tx Transaction) ToTxList() TxList {
 
 	// pointer safety if a transaction
 	// object was ever created with Transaction{}
-	txList := txList{}
+	txList := TxList{}
 	if tx.Input0.BlockNum == nil {
 		tx.Input0.BlockNum = utils.Big0
 	} else if tx.Input1.BlockNum == nil {
