@@ -12,10 +12,10 @@ import (
 	//sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 	//"github.com/cosmos/sdk-application-tutorial/x/nameservice"
-	//       "github.com/FourthState/plasma-mvp-sidechain/client/plasmacli/query"
 	ethcli "github.com/FourthState/plasma-mvp-sidechain/client/plasmacli/eth"
 	"github.com/FourthState/plasma-mvp-sidechain/msgs"
 	"github.com/FourthState/plasma-mvp-sidechain/store"
+	"github.com/FourthState/plasma-mvp-sidechain/utils"
 	ethcmn "github.com/ethereum/go-ethereum/common"
 	hex "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -265,7 +265,10 @@ func postSpendHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc
 
 		txHash := req.TxHash()
 
-		pubKey, err := crypto.SigToPub(txHash, req.Input0.Signature[:])
+		txHashMessage := utils.ToEthSignedMessageHash(txHash)
+		fmt.Println("TX HASH MESSAGE ", ethcmn.ToHex(txHashMessage))
+
+		pubKey, err := crypto.SigToPub(txHashMessage, req.Input0.Signature[:])
 		if err != nil {
 			fmt.Println("error to get public key out of signature")
 			return
