@@ -15,10 +15,10 @@ import (
 	ethcli "github.com/FourthState/plasma-mvp-sidechain/client/plasmacli/eth"
 	"github.com/FourthState/plasma-mvp-sidechain/msgs"
 	"github.com/FourthState/plasma-mvp-sidechain/store"
-	"github.com/FourthState/plasma-mvp-sidechain/utils"
+	//"github.com/FourthState/plasma-mvp-sidechain/utils"
 	ethcmn "github.com/ethereum/go-ethereum/common"
 	hex "github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
+	//"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
 	tm "github.com/tendermint/tendermint/rpc/core/types"
@@ -211,13 +211,13 @@ func postDepositHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFu
 		}
 
 		owner := ethcmn.HexToAddress(req.OwnerAddress)
-		fmt.Println("owner", req.OwnerAddress)
+		//fmt.Println("owner", req.OwnerAddress)
 
 		//baseReq := req.BaseReq.Sanitize()
 		//if !baseReq.ValidateBasic(w) {
 		//	return
 		//}
-		fmt.Println("deposit", req.DepositNonce)
+		//fmt.Println("deposit", req.DepositNonce)
 
 		nonce, ok := new(big.Int).SetString(req.DepositNonce, 10)
 		if !ok {
@@ -231,22 +231,22 @@ func postDepositHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFu
 			ReplayNonce:  uint64(0),
 		}
 
-		fmt.Println("1")
+		//fmt.Println("1")
 		txBytes, err := rlp.EncodeToBytes(&msg)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		fmt.Println("2")
+		//fmt.Println("2")
 		// broadcast to the node
 		res, err := ctx.BroadcastTxAndAwaitCommit(txBytes)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		fmt.Println("3")
-		fmt.Println("res")
+		//fmt.Println("3")
+		//fmt.Println("res")
 		rest.PostProcessResponse(w, cdc, res.TxHash, ctx.Indent)
 		return
 	}
@@ -261,20 +261,20 @@ func postSpendHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFunc
 			return
 		}
 
-		fmt.Println("tx to spend: ", req)
+		//fmt.Println("tx to spend: ", req)
 
-		txHash := req.TxHash()
+		//txHash := req.TxHash()
 
-		txHashMessage := utils.ToEthSignedMessageHash(txHash)
-		fmt.Println("TX HASH MESSAGE ", ethcmn.ToHex(txHashMessage))
+		//txHashMessage := utils.ToEthSignedMessageHash(txHash)
+		//fmt.Println("TX HASH MESSAGE ", ethcmn.ToHex(txHashMessage))
 
-		pubKey, err := crypto.SigToPub(txHashMessage, req.Input0.Signature[:])
-		if err != nil {
-			fmt.Println("error to get public key out of signature")
-			return
-		}
-		signAddr := crypto.PubkeyToAddress(*pubKey)
-		fmt.Printf("address from signature: %x \n", signAddr)
+		//pubKey, err := crypto.SigToPub(txHashMessage, req.Input0.Signature[:])
+		//if err != nil {
+		//	rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
+		//	return
+		//}
+		//signAddr := crypto.PubkeyToAddress(*pubKey)
+		//fmt.Printf("address from signature: %x \n", signAddr)
 
 		// create SpendMsg and txBytes
 		msg := msgs.SpendMsg{
@@ -312,7 +312,7 @@ func postTxHashHandler(cdc *codec.Codec, ctx context.CLIContext) http.HandlerFun
 		}
 
 		txHash := ethcmn.ToHex(req.TxHash())
-		fmt.Println("txHash (hex): ", txHash)
+		//fmt.Println("txHash (hex): ", txHash)
 
 		rest.PostProcessResponse(w, cdc, txHash, ctx.Indent)
 	}
